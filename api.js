@@ -10,6 +10,7 @@ const bodyInput = document.querySelector("#body-input");
 const submitBtn = document.querySelector("#submit-btn");
 
 let notes = [];
+let nextNewKey = 1;
 
 // The API returns Latin placeholder text, so we show our own English
 // text on the same 10 posts. The request and the ids are still real.
@@ -50,6 +51,9 @@ function setStatus(message, type) {
 function setBusy(busy) {
   loadBtn.disabled = busy;
   submitBtn.disabled = busy;
+  for (const btn of document.querySelectorAll(".delete-btn")) {
+    btn.disabled = busy;
+  }
 }
 
 function renderNotes(list) {
@@ -73,7 +77,13 @@ function renderNotes(list) {
     const body = document.createElement("p");
     body.textContent = note.body;
 
-    li.append(title, body);
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.classList.add("delete-btn");
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", () => deleteNote(note));
+
+    li.append(title, body, deleteBtn);
     notesList.append(li);
   }
 }
@@ -86,7 +96,7 @@ async function loadNotes() {
 
   try {
     const result = await request(`${API_URL}?_limit=10`);
-    notes = result.data.map((post, i) => ({ ...post, ...ENGLISH_NOTES[i] }));
+    notes = result.data.map((post, i) => ({ ...post, ...ENGLISH_NOTES[i], key: `post-${post.id}` }));
     renderNotes(notes);
     setStatus(`Loaded ${notes.length} notes from the server.`, "success");
   } catch (error) {
@@ -123,12 +133,35 @@ async function createNote(event) {
       body: JSON.stringify({ title: title, body: body, userId: 1 }),
     });
 
-    notes.unshift(result.data);
+    notes.unshift({ ...result.data, key: `new-${nextNewKey++}` });
     renderNotes(notes);
     setStatus(`Note created (status ${result.status}, id ${result.data.id}).`, "success");
     noteForm.reset();
   } catch (error) {
     setStatus("Sorry, we could not save your note. Please try again.", "error");
+  } finally {
+    setBusy(false);
+  }
+}
+
+// DELETE: remove a note
+// JSONPlaceholder fakes writes. It replies as if a delete worked but
+// stores nothing, and notes we create are never really saved. So we send
+// the DELETE request anyway, trust the success status, and remove the
+// note from our own list. A real API would work the same way, but the
+// record would really be gone. Every created note also comes back with
+// the same id (101), so we match notes by our own key, not by id.
+async function deleteNote(note) {
+  setBusy(true);
+  setStatus("Deleting note...", "loading");
+
+  try {
+    const result = await request(`${API_URL}/${note.id}`, { method: "DELETE" });
+    notes = notes.filter((n) => n.key !== note.key);
+    renderNotes(notes);
+    setStatus(`Note deleted (status ${result.status}).`, "success");
+  } catch (error) {
+    setStatus("Sorry, we could not delete that note. Please try again.", "error");
   } finally {
     setBusy(false);
   }

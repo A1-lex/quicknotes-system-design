@@ -148,3 +148,14 @@ button:disabled {
   }
 }
 
+
+.delete-btn {
+  background-color: #b3261e;
+  margin-top: 10px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background-color: #8c1d18;
+}

@@ -1,10 +1,30 @@
 const API_URL = "https://jsonplaceholder.typicode.com/posts";
+const MAX_TITLE = 100;
 
 const loadBtn = document.querySelector("#load-btn");
 const statusMessage = document.querySelector("#status");
 const notesList = document.querySelector("#notes-list");
+const noteForm = document.querySelector("#note-form");
+const titleInput = document.querySelector("#title-input");
+const bodyInput = document.querySelector("#body-input");
+const submitBtn = document.querySelector("#submit-btn");
 
 let notes = [];
+
+// The API returns Latin placeholder text, so we show our own English
+// text on the same 10 posts. The request and the ids are still real.
+const ENGLISH_NOTES = [
+  { title: "Pele and the World Cup", body: "Pele is the only player to win three World Cups, in 1958, 1962 and 1970." },
+  { title: "Klose, the top scorer", body: "Miroslav Klose scored 16 World Cup goals, the most by any player." },
+  { title: "Fontaine in 1958", body: "Just Fontaine scored 13 goals at the 1958 World Cup, still the record for one tournament." },
+  { title: "Brazil's five stars", body: "Brazil have won the World Cup five times, more than any other country." },
+  { title: "The first World Cup", body: "Uruguay hosted and won the first World Cup in 1930." },
+  { title: "Honey never spoils", body: "Edible honey has been found in Egyptian tombs thousands of years old." },
+  { title: "Three hearts", body: "An octopus has three hearts and blue blood." },
+  { title: "Africa's highest peak", body: "Mount Kilimanjaro rises 5,895 metres above sea level." },
+  { title: "Bananas are berries", body: "Botanically, a banana is a berry, but a strawberry is not." },
+  { title: "Sunlight takes a trip", body: "Light from the Sun takes about 8 minutes to reach Earth." },
+];
 
 // One reusable function for every request
 async function request(url, options = {}) {
@@ -24,6 +44,12 @@ async function request(url, options = {}) {
 function setStatus(message, type) {
   statusMessage.textContent = message;
   statusMessage.className = type;
+}
+
+// Stops the user starting a second request while one is running
+function setBusy(busy) {
+  loadBtn.disabled = busy;
+  submitBtn.disabled = busy;
 }
 
 function renderNotes(list) {
@@ -54,21 +80,60 @@ function renderNotes(list) {
 
 // GET: load 10 notes
 async function loadNotes() {
-  loadBtn.disabled = true;
+  setBusy(true);
   setStatus("Loading notes...", "loading");
   notesList.textContent = "";
 
   try {
     const result = await request(`${API_URL}?_limit=10`);
-    notes = result.data;
+    notes = result.data.map((post, i) => ({ ...post, ...ENGLISH_NOTES[i] }));
     renderNotes(notes);
     setStatus(`Loaded ${notes.length} notes from the server.`, "success");
   } catch (error) {
     notes = [];
     setStatus("Sorry, we could not load your notes. Please check your connection and try again.", "error");
   } finally {
-    loadBtn.disabled = false;
+    setBusy(false);
+  }
+}
+
+// POST: create a note
+async function createNote(event) {
+  event.preventDefault();
+
+  const title = titleInput.value.trim();
+  const body = bodyInput.value.trim();
+
+  if (title === "") {
+    setStatus("Please enter a title.", "error");
+    return;
+  }
+  if (title.length > MAX_TITLE) {
+    setStatus(`Title must be ${MAX_TITLE} characters or fewer.`, "error");
+    return;
+  }
+
+  setBusy(true);
+  setStatus("Saving note...", "loading");
+
+  try {
+    const result = await request(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title, body: body, userId: 1 }),
+    });
+
+    notes.unshift(result.data);
+    renderNotes(notes);
+    setStatus(`Note created (status ${result.status}, id ${result.data.id}).`, "success");
+    noteForm.reset();
+  } catch (error) {
+    setStatus("Sorry, we could not save your note. Please try again.", "error");
+  } finally {
+    setBusy(false);
   }
 }
 
 loadBtn.addEventListener("click", loadNotes);
+noteForm.addEventListener("submit", createNote);
+
